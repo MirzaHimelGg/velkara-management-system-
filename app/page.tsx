@@ -1,3 +1,5 @@
+"use client";
+
 import React from 'react';
 
 // This represents the data coming from your Supabase database
