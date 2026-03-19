@@ -1,98 +1,69 @@
 "use client";
 import React, { useState } from 'react';
+import { ShoppingBag, CreditCard, Banknote, Trash2, CheckCircle2 } from 'lucide-react';
 
-interface CartItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-export default function POSTerminal() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-
-  // Calculate Totals
-  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  const tax = subtotal * 0.05; // 5% VAT (Common in Dhaka)
-  const total = subtotal + tax;
-
-  const addToCart = (product: CartItem) => {
-    setCart(prev => {
-      const existing = prev.find(item => item.id === product.id);
-      if (existing) {
-        return prev.map(item => item.id === product.id 
-          ? { ...item, quantity: item.quantity + 1 } : item);
-      }
-      return [...prev, { ...product, quantity: 1 }];
-    });
-  };
-
-  const handleCheckout = () => {
-    // Logic: In a real app, this sends the 'cart' to Supabase to update stock
-    console.log("Processing Sale...", cart);
-    alert(`Checkout Complete! Total: ৳ ${total.toFixed(2)}`);
-    window.print(); // Simple trick to print a receipt immediately
-    setCart([]);
-  };
+export default function POSPage() {
+  const [cart, setCart] = useState<any[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'digital'>('cash');
 
   return (
-    <div className="flex h-screen bg-gray-100 p-6 gap-6">
-      {/* Left Side: Product Selection / Scanner Area */}
-      <div className="flex-1 bg-white rounded-3xl shadow-sm p-6 overflow-y-auto">
-        <h2 className="text-xl font-bold mb-6">Quick Select Items</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {/* Example Quick-Buttons for Best Sellers */}
-          {['Black Tee (L)', 'Oud Fragrance', 'Leather Bag'].map((item, idx) => (
-            <button 
-              key={idx}
-              onClick={() => addToCart({ id: `${idx}`, name: item, price: 1200 + (idx * 500), quantity: 1 })}
-              className="p-4 border-2 border-gray-50 rounded-2xl hover:border-black transition text-left"
-            >
-              <p className="font-bold">{item}</p>
-              <p className="text-sm text-gray-500">৳ {1200 + (idx * 500)}</p>
-            </button>
-          ))}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in duration-500">
+      {/* Left side: Product Grid/Scanner */}
+      <div className="lg:col-span-2 space-y-6">
+        <div className="bg-white/80 backdrop-blur-md rounded-[32px] p-6 border border-white/40 shadow-xl">
+           <h2 className="text-xl font-bold mb-4">Quick Add</h2>
+           <input 
+             className="w-full bg-slate-100 rounded-2xl px-6 py-4 focus:ring-2 ring-blue-500 outline-none" 
+             placeholder="Search by name or scan barcode..." 
+           />
+        </div>
+        
+        {/* Placeholder for scanned items */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          <button className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100 hover:shadow-md transition text-left">
+            <p className="font-bold">Premium Tee</p>
+            <p className="text-sm text-slate-500">XL / Black</p>
+            <p className="text-blue-600 font-bold mt-2">৳ 1,200</p>
+          </button>
         </div>
       </div>
 
-      {/* Right Side: The Receipt / Checkout Cart */}
-      <div className="w-96 bg-white rounded-3xl shadow-xl flex flex-col overflow-hidden">
-        <div className="p-6 border-b">
-          <h2 className="text-xl font-bold">Current Order</h2>
+      {/* Right side: Modern Cart */}
+      <div className="bg-white/90 backdrop-blur-2xl rounded-[40px] p-8 shadow-2xl border border-white/50 flex flex-col h-[85vh]">
+        <div className="flex items-center mb-8">
+          <ShoppingBag className="w-6 h-6 mr-3 text-blue-600" />
+          <h2 className="text-2xl font-black">Current Order</h2>
         </div>
 
-        <div className="flex-1 p-6 space-y-4 overflow-y-auto">
-          {cart.map(item => (
-            <div key={item.id} className="flex justify-between items-center">
-              <div>
-                <p className="font-medium">{item.name}</p>
-                <p className="text-xs text-gray-400">৳ {item.price} x {item.quantity}</p>
-              </div>
-              <p className="font-bold">৳ {item.price * item.quantity}</p>
-            </div>
-          ))}
+        <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+           {cart.length === 0 ? (
+             <div className="text-center py-20 text-slate-400">Cart is empty</div>
+           ) : null}
         </div>
 
-        <div className="p-6 bg-gray-50 space-y-2 border-t">
-          <div className="flex justify-between text-gray-500">
-            <span>Subtotal</span>
-            <span>৳ {subtotal}</span>
-          </div>
-          <div className="flex justify-between text-gray-500">
-            <span>Tax (5%)</span>
-            <span>৳ {tax.toFixed(0)}</span>
-          </div>
-          <div className="flex justify-between text-2xl font-black mt-2">
+        <div className="mt-6 pt-6 border-t border-slate-100 space-y-4">
+          <div className="flex justify-between font-bold text-2xl">
             <span>Total</span>
-            <span>৳ {total.toFixed(0)}</span>
+            <span>৳ 0.00</span>
           </div>
-          
-          <button 
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className="w-full mt-6 py-4 bg-green-600 text-white rounded-2xl font-bold text-lg hover:bg-green-700 disabled:bg-gray-300 transition"
-          >
-            Complete Sale & Print
+
+          <div className="grid grid-cols-2 gap-3 pt-4">
+            <button 
+              onClick={() => setPaymentMethod('cash')}
+              className={`flex items-center justify-center p-4 rounded-2xl border-2 transition ${paymentMethod === 'cash' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}
+            >
+              <Banknote className="mr-2" /> Cash
+            </button>
+            <button 
+              onClick={() => setPaymentMethod('digital')}
+              className={`flex items-center justify-center p-4 rounded-2xl border-2 transition ${paymentMethod === 'digital' ? 'border-blue-600 bg-blue-50 text-blue-600' : 'border-slate-100 text-slate-400'}`}
+            >
+              <CreditCard className="mr-2" /> Digital
+            </button>
+          </div>
+
+          <button className="w-full bg-slate-900 text-white py-5 rounded-[24px] font-black text-lg shadow-xl active:scale-95 transition-all">
+            COMPLETE SALE
           </button>
         </div>
       </div>
