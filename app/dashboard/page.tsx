@@ -26,8 +26,15 @@ export default function Dashboard() {
   }
 
   async function fetchPrivateData(userId: string) {
+    // Fetch Products
     const { data: prodData } = await supabase.from('products').select('*').eq('user_id', userId);
-    const { data: salesData } = await supabase.from('sales').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    // Fetch Sales - Ordered by newest first
+    const { data: salesData } = await supabase
+      .from('sales')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
     setProducts(prodData || []);
     setSales(salesData || []);
     setLoading(false);
@@ -38,6 +45,7 @@ export default function Dashboard() {
     window.location.href = '/login';
   };
 
+  // --- FIX: Calculate Revenue from total_price ---
   const totalRevenue = sales.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0);
   const lowStockCount = products.filter(p => p.stock <= 5).length;
 
@@ -63,8 +71,8 @@ export default function Dashboard() {
         <div className="lg:hidden bg-slate-800 text-white p-6 space-y-4 animate-in slide-in-from-top duration-300">
           <a href="/dashboard" className="flex items-center p-3 bg-slate-700 rounded-xl font-bold"><LayoutDashboard className="mr-3 w-5 h-5"/> Overview</a>
           <a href="/pos" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><ShoppingBag className="mr-3 w-5 h-5"/> POS Terminal</a>
-          <a href="/inventory" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><Package className="mr-3 w-5 h-5"/> Full Inventory</a>
-          <a href="/add-product" className="flex items-center p-3 hover:bg-slate-700 rounded-xl text-blue-400 font-black"><PlusCircle className="mr-3 w-5 h-5"/> Add Product</a>
+          <a href="/inventory" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><Package className="mr-3 w-5 h-5"/> Inventory</a>
+          <a href="/add-product" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><PlusCircle className="mr-3 w-5 h-5"/> Add Stock</a>
           <button onClick={handleLogout} className="w-full text-left flex items-center p-3 text-rose-400 font-bold pt-4 border-t border-slate-700">
             <LogOut className="mr-3 w-5 h-5"/> Logout
           </button>
@@ -77,8 +85,8 @@ export default function Dashboard() {
         <nav className="space-y-6 flex-1">
           <a href="/dashboard" className="flex items-center text-blue-400 font-bold"><LayoutDashboard className="mr-3 w-5 h-5"/> Overview</a>
           <a href="/pos" className="flex items-center text-slate-400 hover:text-white transition-colors"><ShoppingBag className="mr-3 w-5 h-5"/> POS Terminal</a>
-          <a href="/inventory" className="flex items-center text-slate-400 hover:text-white transition-colors"><Package className="mr-3 w-5 h-5"/> Full Inventory</a>
-          <a href="/add-product" className="flex items-center text-slate-400 hover:text-white transition-colors"><PlusCircle className="mr-3 w-5 h-5"/> Add Product</a>
+          <a href="/inventory" className="flex items-center text-slate-400 hover:text-white transition-colors"><Package className="mr-3 w-5 h-5"/> Inventory</a>
+          <a href="/add-product" className="flex items-center text-slate-400 hover:text-white transition-colors"><PlusCircle className="mr-3 w-5 h-5"/> Add Stock</a>
         </nav>
         <button onClick={handleLogout} className="flex items-center text-rose-400 font-bold mt-auto hover:text-rose-300 transition-colors">
           <LogOut className="mr-3 w-5 h-5"/> Logout
@@ -92,16 +100,16 @@ export default function Dashboard() {
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Store Analytics</h2>
             <p className="text-slate-400 font-medium lowercase">id: {user?.email?.split('@')[0]}</p>
           </div>
-          <div className="flex gap-4 w-full md:w-auto">
-             <button 
+          <div className="flex gap-4">
+              <button 
                 onClick={() => window.location.href='/add-product'}
-                className="flex-1 md:flex-none bg-slate-100 text-slate-900 px-6 py-4 rounded-[20px] font-black hover:bg-slate-200 transition-all flex items-center justify-center border border-slate-200"
+                className="bg-white text-slate-900 px-6 py-4 rounded-[20px] font-black border border-slate-200 hover:bg-slate-50 transition-all flex items-center"
               >
                 <PlusCircle className="mr-2 w-5 h-5"/> ADD STOCK
               </button>
               <button 
                 onClick={() => window.location.href='/pos'}
-                className="flex-1 md:flex-none bg-blue-600 text-white px-8 py-4 rounded-[20px] font-black shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+                className="bg-blue-600 text-white px-8 py-4 rounded-[20px] font-black shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all flex items-center"
               >
                 <Plus className="mr-2 w-5 h-5"/> NEW SALE
               </button>
@@ -132,12 +140,14 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* RECENT TRANSACTIONS - Corrected logic */}
           <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 p-8">
             <h4 className="text-xl font-black mb-6">Recent Transactions</h4>
             <div className="space-y-4">
               {sales.slice(0, 5).map((sale) => (
                 <div key={sale.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
                   <div>
+                    {/* Use total_price here to match your POS logic */}
                     <p className="font-black text-slate-900">৳{sale.total_price || 0}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{sale.customer_phone || 'Guest'}</p>
                   </div>
@@ -148,11 +158,9 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* INVENTORY QUICK VIEW */}
           <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 p-8">
-            <div className="flex justify-between items-center mb-6">
-              <h4 className="text-xl font-black">Quick Inventory</h4>
-              <button onClick={() => window.location.href='/inventory'} className="text-[10px] font-black text-blue-600 uppercase border-b-2 border-blue-600 pb-1">See All</button>
-            </div>
+            <h4 className="text-xl font-black mb-6">Inventory Status</h4>
             <div className="space-y-4">
               {products.slice(0, 5).map((prod) => (
                 <div key={prod.id} className="flex justify-between items-center p-4 border-b border-slate-50 last:border-none">
