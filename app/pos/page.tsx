@@ -1,12 +1,15 @@
 "use client";
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   ShoppingCart, Trash2, User, Tag, 
   Plus, Minus, Loader2, CheckCircle, Printer, Search, X 
 } from 'lucide-react';
 
-const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export default function POSPage() {
   const [cart, setCart] = useState<any[]>([]);
@@ -15,12 +18,39 @@ export default function POSPage() {
   const [globalDiscount, setGlobalDiscount] = useState(0);
   const [loading, setLoading] = useState(false);
   
-  // UNIVERSAL SEARCH STATES
+  // Universal Search States
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showResults, setShowResults] = useState(false);
 
-  // 1. UNIVERSAL SEARCH LOGIC (Triggers as you type)
+  // --- 1. THE AUTO-ADD FIX (FOR SCANNER REDIRECT) ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const skuFromUrl = params.get('sku');
+
+    if (skuFromUrl) {
+      // Auto-fetch the product from Supabase using the SKU in the URL
+      const triggerAutoAdd = async () => {
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('sku', skuFromUrl)
+          .single();
+
+        if (data && !error) {
+          addToCartFromSearch(data);
+          // Clean the URL so refreshing doesn't double-add
+          window.history.replaceState({}, document.title, "/pos");
+        } else {
+          alert("Scanned item not found: " + skuFromUrl);
+        }
+      };
+      
+      triggerAutoAdd();
+    }
+  }, []);
+
+  // --- 2. UNIVERSAL SEARCH LOGIC ---
   useEffect(() => {
     const delayDebounce = setTimeout(() => {
       if (searchQuery.length > 1) {
@@ -29,8 +59,7 @@ export default function POSPage() {
         setSearchResults([]);
         setShowResults(false);
       }
-    }, 300); // Wait 300ms after typing stops
-
+    }, 300);
     return () => clearTimeout(delayDebounce);
   }, [searchQuery]);
 
@@ -48,19 +77,23 @@ export default function POSPage() {
   }
 
   const addToCartFromSearch = (product: any) => {
-    const existing = cart.find(item => item.id === product.id);
-    if (existing) {
-      updateQuantity(existing.cartId, 1);
-    } else {
-      setCart(prev => [...prev, { 
-        ...product, 
-        cartId: Date.now(), 
-        quantity: 1, 
-        customPrice: product.price,
-        variant_size: product.variant_size || '', 
-        variant_color: product.variant_color || '' 
-      }]);
-    }
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => 
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      } else {
+        return [...prev, { 
+          ...product, 
+          cartId: Date.now(), 
+          quantity: 1, 
+          customPrice: product.price,
+          variant_size: product.variant_size || '', 
+          variant_color: product.variant_color || '' 
+        }];
+      }
+    });
     setSearchQuery('');
     setShowResults(false);
   };
@@ -72,7 +105,8 @@ export default function POSPage() {
   };
 
   const updateItemDetail = (cartId: number, field: string, value: string | number) => {
-    setCart(prev => prev.map(item => item.cartId === cartId ? { ...item, [field]: value } : item
+    setCart(prev => prev.map(item => 
+      item.cartId === cartId ? { ...item, [field]: value } : item
     ));
   };
 
@@ -88,7 +122,11 @@ export default function POSPage() {
     setLoading(true);
     try {
       if (finalTotal >= 5000 && customerPhone) {
-        await supabase.from('customers').upsert({ phone: customerPhone, name: customerName, membership_tier: 'Gold' }, { onConflict: 'phone' });
+        await supabase.from('customers').upsert({ 
+          phone: customerPhone, 
+          name: customerName, 
+          membership_tier: 'Gold' 
+        }, { onConflict: 'phone' });
       }
       const { error: saleError } = await supabase.from('sales').insert({
         customer_phone: customerPhone || 'Guest',
@@ -101,7 +139,7 @@ export default function POSPage() {
         await supabase.rpc('decrement_stock', { row_id: item.id, quantity: item.quantity });
       }
       printReceipt();
-      alert(finalTotal >= 5000 ? "Sale Complete! New Member Added." : "Sale Complete!");
+      alert(finalTotal >= 5000 ? "Sale Complete! Membership Updated." : "Sale Complete!");
       setCart([]); setCustomerName(''); setCustomerPhone(''); setGlobalDiscount(0);
     } catch (err: any) { alert("Error: " + err.message); } finally { setLoading(false); }
   };
@@ -132,16 +170,10 @@ export default function POSPage() {
                 />
               </div>
             </div>
-
-            {/* FLOATING SEARCH RESULTS */}
             {showResults && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[25px] shadow-2xl border border-slate-100 overflow-hidden animate-in fade-in slide-in-from-top-2">
+              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-[25px] shadow-2xl border border-slate-100 overflow-hidden">
                 {searchResults.map(product => (
-                  <div 
-                    key={product.id} 
-                    onClick={() => addToCartFromSearch(product)}
-                    className="p-5 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-none"
-                  >
+                  <div key={product.id} onClick={() => addToCartFromSearch(product)} className="p-5 hover:bg-blue-50 cursor-pointer flex justify-between items-center transition-colors border-b border-slate-50 last:border-none">
                     <div>
                       <p className="font-black text-slate-900">{product.name}</p>
                       <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">{product.sku} | {product.category}</p>
@@ -199,7 +231,7 @@ export default function POSPage() {
           <h2 className="text-xl font-black mb-6 flex items-center"><User className="mr-2 text-blue-600"/> Customer Details</h2>
           <div className="space-y-4">
             <input placeholder="Name" className="w-full bg-slate-50 p-4 rounded-2xl outline-none border border-slate-100 focus:border-blue-400 font-bold" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-            <input placeholder="Phone (017...)" className="w-full bg-slate-50 p-4 rounded-2xl outline-none border border-slate-100 focus:border-blue-400 font-bold" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
+            <input placeholder="Phone" className="w-full bg-slate-50 p-4 rounded-2xl outline-none border border-slate-100 focus:border-blue-400 font-bold" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
             {finalTotal >= 5000 && customerPhone && (
               <div className="bg-emerald-50 text-emerald-600 p-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center border border-emerald-100"><CheckCircle className="w-3 h-3 mr-2" /> Membership Qualified (৳5000+)</div>
             )}
