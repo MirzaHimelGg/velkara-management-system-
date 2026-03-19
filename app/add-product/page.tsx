@@ -1,149 +1,146 @@
 "use client";
 import React, { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Plus, X, Save, ArrowLeft, Loader2, Printer } from 'lucide-react';
+import { Plus, X, Save, ArrowLeft, Loader2, Camera, Search } from 'lucide-react';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-export default function AddProduct() {
+export default function SmartAddProduct() {
+  const [sku, setSku] = useState('');
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
   const [price, setPrice] = useState('');
-  const [sizes, setSizes] = useState<string[]>([]);
-  const [colors, setColors] = useState<string[]>([]);
-  const [currentSize, setCurrentSize] = useState('');
-  const [currentColor, setCurrentColor] = useState('');
+  const [stockToAdd, setStockToAdd] = useState('1');
+  const [size, setSize] = useState('');
+  const [color, setColor] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isNewProduct, setIsNewProduct] = useState(true);
 
-  const addTag = (type: 'size' | 'color') => {
-    if (type === 'size' && currentSize.trim()) {
-      if (!sizes.includes(currentSize.trim())) setSizes([...sizes, currentSize.trim()]);
-      setCurrentSize('');
-    } else if (type === 'color' && currentColor.trim()) {
-      if (!colors.includes(currentColor.trim())) setColors([...colors, currentColor.trim()]);
-      setCurrentColor('');
-    }
-  };
-
-  // --- THE LABEL PRINTER ENGINE ---
-  const printBarcodes = (variants: any[]) => {
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(`
-        <html>
-          <head>
-            <title>Velkara Labels</title>
-            <style>
-              body { display: flex; flex-wrap: wrap; gap: 10px; font-family: sans-serif; padding: 20px; }
-              .label { 
-                width: 150px; border: 1px solid #000; padding: 10px; text-align: center; 
-                border-radius: 5px; page-break-inside: avoid;
-              }
-              .brand { font-weight: 900; font-size: 14px; margin-bottom: 2px; }
-              .name { font-size: 10px; color: #555; }
-              .price { font-size: 16px; font-weight: 900; margin: 5px 0; }
-              .sku { font-family: 'Libre Barcode 39', 'Courier New', monospace; font-size: 12px; border-top: 1px dashed #ccc; padding-top: 5px; }
-              .details { font-size: 9px; font-weight: bold; text-transform: uppercase; }
-            </style>
-          </head>
-          <body>
-            ${variants.map(v => `
-              <div class="label">
-                <div class="brand">VELKARA.</div>
-                <div class="name">${v.name}</div>
-                <div class="price">৳${v.price}</div>
-                <div class="details">${v.variant_size} / ${v.variant_color}</div>
-                <div class="sku">${v.sku}</div>
-              </div>
-            `).join('')}
-            <script>window.onload = function() { window.print(); window.close(); };</script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-    }
-  };
-
-  const handleGenerateAndSave = async () => {
-    if (!name || sizes.length === 0 || colors.length === 0 || !price || !category) {
-      alert("Fill all fields first!");
-      return;
-    }
-
+  // 1. ACTION: Search for SKU after scanning or typing
+  const handleLookup = async (inputSku: string) => {
+    setSku(inputSku);
     setLoading(true);
-    const allVariants: any[] = [];
-
-    sizes.forEach(s => {
-      colors.forEach(c => {
-        allVariants.push({
-          name: name,
-          category: category.trim(),
-          variant_size: s,
-          variant_color: c,
-          stock: 0,
-          price: parseFloat(price),
-          sku: `VEL-${name.substring(0,3).toUpperCase()}-${s}-${c.substring(0,2).toUpperCase()}`
-        });
-      });
-    });
-
-    const { error } = await supabase.from('products').insert(allVariants);
-
-    if (error) {
-      alert("Error: " + error.message);
+    const { data, error } = await supabase.from('products').select('*').eq('sku', inputSku).single();
+    
+    if (data) {
+      // Product exists - Fill info for restocking
+      setName(data.name);
+      setCategory(data.category);
+      setPrice(data.price);
+      setSize(data.variant_size);
+      setColor(data.variant_color);
+      setIsNewProduct(false);
+      alert("Existing Product Found! Adjust info or just add stock.");
     } else {
-      const confirmPrint = window.confirm(`Success! ${allVariants.length} variants created. Do you want to print price tags now?`);
-      if (confirmPrint) printBarcodes(allVariants);
-      window.location.href = '/dashboard';
+      // New Product - Clear fields but keep SKU
+      setIsNewProduct(true);
+      alert("New SKU detected. Please enter product details.");
     }
     setLoading(false);
   };
 
+  const handleSave = async () => {
+    if (!sku || !name || !price) return alert("SKU, Name, and Price are mandatory!");
+    setLoading(true);
+
+    if (isNewProduct) {
+      // CREATE NEW
+      const { error } = await supabase.from('products').insert([{
+        sku, name, category, price: parseFloat(price), 
+        variant_size: size, variant_color: color, stock: parseInt(stockToAdd)
+      }]);
+      if (!error) alert("New Product Added!");
+    } else {
+      // UPDATE EXISTING STOCK
+      const { data } = await supabase.from('products').select('stock').eq('sku', sku).single();
+      const { error } = await supabase.from('products').update({
+        stock: (data?.stock || 0) + parseInt(stockToAdd),
+        price: parseFloat(price) // Update price in case it changed
+      }).eq('sku', sku);
+      if (!error) alert("Stock Updated Successfully!");
+    }
+
+    setLoading(false);
+    window.location.href = '/dashboard';
+  };
+
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 animate-in fade-in slide-in-from-bottom-4">
-      <button onClick={() => window.location.href='/dashboard'} className="flex items-center text-slate-500 hover:text-blue-600 mb-6 font-bold">
-        <ArrowLeft className="w-4 h-4 mr-2" /> Back
+    <div className="max-w-2xl mx-auto py-10 px-4 animate-in fade-in">
+      <button onClick={() => window.location.href='/dashboard'} className="flex items-center text-slate-500 font-bold mb-6 hover:text-blue-600">
+        <ArrowLeft className="w-4 h-4 mr-2" /> Back to Dashboard
       </button>
 
-      <div className="bg-white/70 backdrop-blur-2xl border border-white shadow-2xl rounded-[40px] p-8 md:p-12">
-        <h1 className="text-4xl font-black mb-8 text-slate-900">Add Inventory</h1>
-        
+      <div className="bg-white/80 backdrop-blur-2xl border border-white shadow-2xl rounded-[40px] p-8 md:p-12">
+        <h1 className="text-3xl font-black mb-8 text-slate-900">
+          {isNewProduct ? "Add New Product" : "Restock Inventory"}
+        </h1>
+
         <div className="space-y-6">
+          {/* SKU INPUT SECTION */}
+          <div className="bg-slate-900 p-6 rounded-3xl text-white">
+            <label className="block text-[10px] font-black uppercase tracking-widest mb-2 opacity-60">Product SKU / Barcode</label>
+            <div className="flex gap-3">
+              <input 
+                value={sku}
+                onChange={(e) => setSku(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLookup(sku)}
+                placeholder="Scan or Type SKU..."
+                className="flex-1 bg-white/10 border border-white/20 p-4 rounded-xl outline-none font-black text-xl placeholder:text-white/20"
+              />
+              <button onClick={() => handleLookup(sku)} className="bg-blue-600 p-4 rounded-xl hover:bg-blue-500 transition-colors">
+                <Search size={24} />
+              </button>
+            </div>
+          </div>
+
+          {/* DYNAMIC FORM SECTION */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input placeholder="Product Name" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold" onChange={(e) => setName(e.target.value)} />
-            <input placeholder="Category (e.g. Panjabi)" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold" onChange={(e) => setCategory(e.target.value)} />
-          </div>
-
-          <input type="number" placeholder="Price (৳)" className="w-full bg-slate-50 border border-slate-200 rounded-2xl p-4 font-bold" onChange={(e) => setPrice(e.target.value)} />
-
-          {/* SIZES */}
-          <div>
-            <div className="flex flex-wrap gap-2 mb-2">{sizes.map(s => <span key={s} className="bg-blue-600 text-white px-3 py-1 rounded-full text-xs font-black flex items-center">{s} <X className="ml-2 cursor-pointer w-3 h-3" onClick={() => setSizes(sizes.filter(x => x !== s))} /></span>)}</div>
-            <div className="flex gap-2">
-              <input value={currentSize} onChange={(e) => setCurrentSize(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag('size'))} className="flex-1 bg-slate-50 p-3 rounded-xl outline-none" placeholder="Add size (e.g. XL)..." />
-              <button onClick={() => addTag('size')} className="p-3 bg-slate-900 text-white rounded-xl"><Plus/></button>
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase ml-1">Name</label>
+              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold" placeholder="Product Name" />
+            </div>
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase ml-1">Category</label>
+              <input value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold" placeholder="e.g. Panjabi" />
             </div>
           </div>
 
-          {/* COLORS */}
-          <div>
-            <div className="flex flex-wrap gap-2 mb-2">{colors.map(c => <span key={c} className="bg-slate-900 text-white px-3 py-1 rounded-full text-xs font-black flex items-center">{c} <X className="ml-2 cursor-pointer w-3 h-3" onClick={() => setColors(colors.filter(x => x !== c))} /></span>)}</div>
-            <div className="flex gap-2">
-              <input value={currentColor} onChange={(e) => setCurrentColor(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag('color'))} className="flex-1 bg-slate-50 p-3 rounded-xl outline-none" placeholder="Add color (e.g. Black)..." />
-              <button onClick={() => addTag('color')} className="p-3 bg-slate-900 text-white rounded-xl"><Plus/></button>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+             <div>
+              <label className="text-xs font-black text-slate-400 uppercase ml-1">Price (৳)</label>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold text-blue-600" />
             </div>
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase ml-1">Size</label>
+              <input value={size} onChange={(e) => setSize(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold" placeholder="XL, 42..." />
+            </div>
+            <div>
+              <label className="text-xs font-black text-slate-400 uppercase ml-1">Color</label>
+              <input value={color} onChange={(e) => setColor(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold" placeholder="Black..." />
+            </div>
+          </div>
+
+          <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
+            <label className="block text-xs font-black text-blue-900 uppercase mb-2">Quantity to Add</label>
+            <input 
+              type="number" 
+              value={stockToAdd} 
+              onChange={(e) => setStockToAdd(e.target.value)} 
+              className="w-full bg-white border-2 border-blue-200 p-4 rounded-xl font-black text-2xl text-blue-600"
+            />
           </div>
 
           <button 
-            onClick={handleGenerateAndSave}
+            onClick={handleSave}
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-6 rounded-[24px] shadow-xl flex justify-center items-center disabled:opacity-50"
+            className="w-full bg-slate-900 text-white py-6 rounded-[25px] font-black text-xl shadow-2xl hover:scale-[1.02] active:scale-95 transition-all flex justify-center items-center"
           >
-            {loading ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-            GENERATE & PRINT TAGS
+            {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />}
+            {isNewProduct ? "CONFIRM & ADD PRODUCT" : "UPDATE EXISTING INVENTORY"}
           </button>
         </div>
       </div>
     </div>
   );
 }
+
