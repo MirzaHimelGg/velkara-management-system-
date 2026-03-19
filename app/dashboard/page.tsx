@@ -38,7 +38,7 @@ export default function Dashboard() {
     window.location.href = '/login';
   };
 
-  // Use total_price instead of total_amount
+  // --- CRITICAL FIX: Use total_price for Revenue ---
   const totalRevenue = sales.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0);
   const lowStockCount = products.filter(p => p.stock <= 5).length;
 
@@ -51,7 +51,7 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[#f8fafc] flex flex-col lg:flex-row">
       
-      {/* 1. MOBILE HEADER (Shows on vertical iPad & Phone) */}
+      {/* 1. MOBILE HEADER */}
       <div className="lg:hidden bg-slate-900 text-white p-5 flex justify-between items-center shadow-lg sticky top-0 z-50">
         <h1 className="text-xl font-black tracking-tighter">VELKARA.</h1>
         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
@@ -71,7 +71,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* 3. DESKTOP SIDEBAR (Hidden on vertical iPad & Phone) */}
+      {/* 3. DESKTOP SIDEBAR */}
       <div className="w-64 bg-slate-900 text-white p-8 hidden lg:flex flex-col h-screen sticky top-0">
         <h1 className="text-2xl font-black tracking-tighter mb-12">VELKARA.</h1>
         <nav className="space-y-6 flex-1">
@@ -125,7 +125,8 @@ export default function Dashboard() {
               {sales.slice(0, 5).map((sale) => (
                 <div key={sale.id} className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
                   <div>
-                    <p className="font-black text-slate-900">৳{sale.total_amount}</p>
+                    {/* CRITICAL FIX: Change total_amount to total_price */}
+                    <p className="font-black text-slate-900">৳{sale.total_price || 0}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{sale.customer_phone || 'Guest'}</p>
                   </div>
                   <span className="text-[10px] font-black text-emerald-500 uppercase">Paid</span>
