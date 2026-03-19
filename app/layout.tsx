@@ -1,6 +1,6 @@
-import './globals.css';
 "use client";
-
+import './globals.css';  // The dot and slash are very important!
+import React from 'react';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
