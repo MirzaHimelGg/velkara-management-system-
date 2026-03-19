@@ -38,7 +38,8 @@ export default function Dashboard() {
     window.location.href = '/login';
   };
 
-  const totalRevenue = sales.reduce((sum, s) => sum + (s.total_amount || 0), 0);
+  // Use total_price instead of total_amount
+  const totalRevenue = sales.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0);
   const lowStockCount = products.filter(p => p.stock <= 5).length;
 
   if (loading) return (
