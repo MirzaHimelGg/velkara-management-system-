@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Plus, Save, ArrowLeft, Loader2, Search, Sparkles, Camera, X, CheckCircle2 } from 'lucide-react';
+import { Plus, Save, ArrowLeft, Loader2, Search, Sparkles, Camera, X, CheckCircle2, Printer } from 'lucide-react';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
@@ -21,33 +21,44 @@ export default function SmartAddProduct() {
   
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
 
-  // --- CRASH-PROOF CAMERA LOGIC ---
+  // --- PRINT LOGIC ---
+  const printBarcode = (printName: string, printSku: string, printPrice: string, printSize: string) => {
+    const win = window.open('', '_blank');
+    if (win) {
+      win.document.write(`
+        <html>
+          <body style="font-family: 'Courier New', Courier, monospace; width: 200px; padding: 10px; text-align: center; border: 1px dashed #ccc;">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 900;">VELKARA.</h2>
+            <p style="margin: 2px 0; font-size: 12px; font-weight: bold;">${printName}</p>
+            <div style="margin: 5px 0; background: black; color: white; padding: 5px; font-size: 14px; letter-spacing: 2px; font-weight: bold;">
+              ${printSku}
+            </div>
+            <p style="margin: 2px 0; font-size: 10px;">Size: ${printSize || 'N/A'}</p>
+            <h1 style="margin: 5px 0; font-size: 22px; font-weight: 900;">৳${printPrice}</h1>
+            <script>window.print(); window.close();</script>
+          </body>
+        </html>
+      `);
+      win.document.close();
+    }
+  };
+
   const startCamera = async () => {
     setShowScanner(true);
-    // Give the DOM a moment to render the 'reader' div
     setTimeout(async () => {
       try {
         const scanner = new Html5Qrcode("reader");
         html5QrCodeRef.current = scanner;
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (decodedText) => {
+        await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (decodedText) => {
             handleLookup(decodedText);
             stopCamera();
-          },
-          () => {}
-        );
-      } catch (err) {
-        console.error("Camera Start Error:", err);
-      }
+          }, () => {});
+      } catch (err) { console.error(err); }
     }, 300);
   };
 
   const stopCamera = async () => {
-    if (html5QrCodeRef.current && html5QrCodeRef.current.isScanning) {
-      await html5QrCodeRef.current.stop();
-    }
+    if (html5QrCodeRef.current?.isScanning) await html5QrCodeRef.current.stop();
     setShowScanner(false);
   };
 
@@ -75,13 +86,14 @@ export default function SmartAddProduct() {
     setLoading(false);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (shouldPrint: boolean = false) => {
     if (!sku || !name || !price) return alert("SKU, Name, and Price are mandatory!");
     setLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       if (isNewProduct) {
         await supabase.from('products').insert([{
-          sku, name, category, price: parseFloat(price), 
+          user_id: user?.id, sku, name, category, price: parseFloat(price), 
           variant_size: size, variant_color: color, stock: parseInt(stockToAdd)
         }]);
       } else {
@@ -91,6 +103,9 @@ export default function SmartAddProduct() {
           price: parseFloat(price)
         }).eq('sku', sku);
       }
+      
+      if (shouldPrint) printBarcode(name, sku, price, size);
+
       setLastAdded(name);
       setSku(''); setName(''); setPrice(''); setSize(''); setColor(''); setStockToAdd('1');
       setTimeout(() => setLastAdded(null), 3000);
@@ -101,8 +116,8 @@ export default function SmartAddProduct() {
   return (
     <div className="max-w-2xl mx-auto py-10 px-4">
       <div className="flex justify-between items-center mb-6">
-        <button onClick={() => window.location.href='/dashboard'} className="flex items-center text-slate-500 font-bold hover:text-blue-600 transition-colors">
-          <ArrowLeft className="w-4 h-4 mr-2" /> Finish & Exit
+        <button onClick={() => window.location.href='/dashboard'} className="flex items-center text-slate-500 font-bold hover:text-blue-600">
+          <ArrowLeft className="w-4 h-4 mr-2" /> Finish
         </button>
         {lastAdded && (
           <div className="bg-emerald-100 text-emerald-700 px-4 py-2 rounded-full text-xs font-black flex items-center animate-bounce">
@@ -113,7 +128,7 @@ export default function SmartAddProduct() {
 
       <div className="bg-white/80 backdrop-blur-2xl border border-white shadow-2xl rounded-[40px] p-8 md:p-12">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Inventory Entry</h1>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Stock Entry</h1>
           <button onClick={startCamera} className="bg-blue-600 text-white p-4 rounded-2xl hover:scale-110 transition-all shadow-lg"><Camera /></button>
         </div>
 
@@ -149,14 +164,19 @@ export default function SmartAddProduct() {
             <input value={color} onChange={(e) => setColor(e.target.value)} className="w-full bg-slate-50 border p-4 rounded-2xl font-bold" placeholder="Color" />
           </div>
 
-          <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100">
-            <label className="block text-xs font-black text-blue-900 mb-2 uppercase text-center">Quantity to Add</label>
-            <input type="number" value={stockToAdd} onChange={(e) => setStockToAdd(e.target.value)} className="w-full bg-white p-4 rounded-xl font-black text-2xl text-blue-600 text-center outline-none" />
+          <div className="bg-blue-50 p-6 rounded-3xl border border-blue-100 text-center">
+            <label className="block text-xs font-black text-blue-900 mb-2 uppercase">Quantity</label>
+            <input type="number" value={stockToAdd} onChange={(e) => setStockToAdd(e.target.value)} className="w-full bg-white p-4 rounded-xl font-black text-2xl text-blue-600 outline-none text-center" />
           </div>
 
-          <button onClick={handleSave} disabled={loading} className="w-full bg-blue-600 text-white py-6 rounded-[25px] font-black text-xl flex justify-center items-center shadow-xl active:scale-95 transition-all">
-            {loading ? <Loader2 className="animate-spin" /> : <Plus className="mr-2" />} SAVE & NEXT
-          </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onClick={() => handleSave(false)} disabled={loading} className="bg-slate-100 text-slate-900 py-6 rounded-[25px] font-black text-lg flex justify-center items-center active:scale-95 transition-all">
+              {loading ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />} SAVE ONLY
+            </button>
+            <button onClick={() => handleSave(true)} disabled={loading} className="bg-blue-600 text-white py-6 rounded-[25px] font-black text-lg flex justify-center items-center shadow-xl active:scale-95 transition-all">
+              {loading ? <Loader2 className="animate-spin" /> : <Printer className="mr-2" />} SAVE & PRINT TAG
+            </button>
+          </div>
         </div>
       </div>
     </div>
