@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   LayoutDashboard, Package, ShoppingBag, 
-  TrendingUp, AlertTriangle, Plus, LogOut, Loader2, Menu, X 
+  TrendingUp, AlertTriangle, Plus, LogOut, Loader2, Menu, X, PlusCircle 
 } from 'lucide-react';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
@@ -38,7 +38,6 @@ export default function Dashboard() {
     window.location.href = '/login';
   };
 
-  // --- MATH FIX: Use total_price for Revenue ---
   const totalRevenue = sales.reduce((sum, s) => sum + (Number(s.total_price) || 0), 0);
   const lowStockCount = products.filter(p => p.stock <= 5).length;
 
@@ -65,6 +64,7 @@ export default function Dashboard() {
           <a href="/dashboard" className="flex items-center p-3 bg-slate-700 rounded-xl font-bold"><LayoutDashboard className="mr-3 w-5 h-5"/> Overview</a>
           <a href="/pos" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><ShoppingBag className="mr-3 w-5 h-5"/> POS Terminal</a>
           <a href="/inventory" className="flex items-center p-3 hover:bg-slate-700 rounded-xl"><Package className="mr-3 w-5 h-5"/> Full Inventory</a>
+          <a href="/add-product" className="flex items-center p-3 hover:bg-slate-700 rounded-xl text-blue-400 font-black"><PlusCircle className="mr-3 w-5 h-5"/> Add Product</a>
           <button onClick={handleLogout} className="w-full text-left flex items-center p-3 text-rose-400 font-bold pt-4 border-t border-slate-700">
             <LogOut className="mr-3 w-5 h-5"/> Logout
           </button>
@@ -78,61 +78,60 @@ export default function Dashboard() {
           <a href="/dashboard" className="flex items-center text-blue-400 font-bold"><LayoutDashboard className="mr-3 w-5 h-5"/> Overview</a>
           <a href="/pos" className="flex items-center text-slate-400 hover:text-white transition-colors"><ShoppingBag className="mr-3 w-5 h-5"/> POS Terminal</a>
           <a href="/inventory" className="flex items-center text-slate-400 hover:text-white transition-colors"><Package className="mr-3 w-5 h-5"/> Full Inventory</a>
+          <a href="/add-product" className="flex items-center text-slate-400 hover:text-white transition-colors"><PlusCircle className="mr-3 w-5 h-5"/> Add Product</a>
         </nav>
         <button onClick={handleLogout} className="flex items-center text-rose-400 font-bold mt-auto hover:text-rose-300 transition-colors">
           <LogOut className="mr-3 w-5 h-5"/> Logout
         </button>
       </div>
 
-      {/* MAIN AREA */}
+      {/* MAIN CONTENT */}
       <div className="flex-1 p-6 lg:p-12 overflow-y-auto">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
           <div>
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Store Analytics</h2>
             <p className="text-slate-400 font-medium lowercase">id: {user?.email?.split('@')[0]}</p>
           </div>
-          <button 
-            onClick={() => window.location.href='/pos'}
-            className="w-full md:w-auto bg-blue-600 text-white px-8 py-4 rounded-[20px] font-black shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
-          >
-            <Plus className="mr-2 w-5 h-5"/> NEW SALE
-          </button>
+          <div className="flex gap-4 w-full md:w-auto">
+             <button 
+                onClick={() => window.location.href='/add-product'}
+                className="flex-1 md:flex-none bg-slate-100 text-slate-900 px-6 py-4 rounded-[20px] font-black hover:bg-slate-200 transition-all flex items-center justify-center border border-slate-200"
+              >
+                <PlusCircle className="mr-2 w-5 h-5"/> ADD STOCK
+              </button>
+              <button 
+                onClick={() => window.location.href='/pos'}
+                className="flex-1 md:flex-none bg-blue-600 text-white px-8 py-4 rounded-[20px] font-black shadow-xl shadow-blue-100 hover:scale-105 active:scale-95 transition-all flex items-center justify-center"
+              >
+                <Plus className="mr-2 w-5 h-5"/> NEW SALE
+              </button>
+          </div>
         </header>
 
-        {/* CLICKABLE STAT CARDS */}
+        {/* STAT CARDS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-          {/* Revenue Card */}
           <div className="bg-white p-8 rounded-[35px] shadow-sm border border-slate-100">
             <TrendingUp className="text-emerald-500 mb-4 w-8 h-8" />
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Revenue</p>
             <h3 className="text-4xl font-black text-slate-900">৳{totalRevenue}</h3>
           </div>
 
-          {/* Active SKU - Clickable */}
-          <div 
-            onClick={() => window.location.href='/inventory'}
-            className="bg-white p-8 rounded-[35px] shadow-sm border border-slate-100 cursor-pointer hover:border-blue-500 transition-all group"
-          >
+          <div onClick={() => window.location.href='/inventory'} className="bg-white p-8 rounded-[35px] shadow-sm border border-slate-100 cursor-pointer hover:border-blue-500 transition-all group">
             <Package className="text-blue-500 mb-4 w-8 h-8 group-hover:scale-110 transition-transform" />
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Active SKU</p>
             <h3 className="text-4xl font-black text-slate-900">{products.length}</h3>
-            <p className="text-[10px] text-blue-600 font-bold mt-2 opacity-0 group-hover:opacity-100">VIEW LIST →</p>
+            <p className="text-[10px] text-blue-600 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">VIEW ALL →</p>
           </div>
 
-          {/* Low Stock - Clickable */}
-          <div 
-            onClick={() => window.location.href='/inventory?filter=low'}
-            className="bg-white p-8 rounded-[35px] shadow-sm border border-slate-100 cursor-pointer hover:border-rose-500 transition-all group sm:col-span-2 lg:col-span-1"
-          >
+          <div onClick={() => window.location.href='/inventory?filter=low'} className="bg-white p-8 rounded-[35px] shadow-sm border border-slate-100 cursor-pointer hover:border-rose-500 transition-all group sm:col-span-2 lg:col-span-1">
             <AlertTriangle className={`${lowStockCount > 0 ? 'text-rose-500 animate-pulse' : 'text-slate-200'} mb-4 w-8 h-8 group-hover:scale-110 transition-transform`} />
             <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Low Stock</p>
             <h3 className="text-4xl font-black text-slate-900">{lowStockCount}</h3>
-            <p className="text-[10px] text-rose-600 font-bold mt-2 opacity-0 group-hover:opacity-100">RESTOCK →</p>
+            <p className="text-[10px] text-rose-600 font-bold mt-2 opacity-0 group-hover:opacity-100 transition-opacity">RESTOCK →</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* TRANSACTIONS */}
           <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 p-8">
             <h4 className="text-xl font-black mb-6">Recent Transactions</h4>
             <div className="space-y-4">
@@ -142,16 +141,18 @@ export default function Dashboard() {
                     <p className="font-black text-slate-900">৳{sale.total_price || 0}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase">{sale.customer_phone || 'Guest'}</p>
                   </div>
-                  <span className="text-[10px] font-black text-emerald-500 uppercase">Paid</span>
+                  <span className="text-[10px] font-black text-emerald-500 uppercase tracking-tighter">Success</span>
                 </div>
               ))}
               {sales.length === 0 && <p className="text-center text-slate-300 py-10">No sales yet.</p>}
             </div>
           </div>
 
-          {/* INVENTORY QUICK VIEW */}
           <div className="bg-white rounded-[40px] shadow-sm border border-slate-100 p-8">
-            <h4 className="text-xl font-black mb-6">Inventory Status</h4>
+            <div className="flex justify-between items-center mb-6">
+              <h4 className="text-xl font-black">Quick Inventory</h4>
+              <button onClick={() => window.location.href='/inventory'} className="text-[10px] font-black text-blue-600 uppercase border-b-2 border-blue-600 pb-1">See All</button>
+            </div>
             <div className="space-y-4">
               {products.slice(0, 5).map((prod) => (
                 <div key={prod.id} className="flex justify-between items-center p-4 border-b border-slate-50 last:border-none">
